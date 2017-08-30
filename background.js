@@ -2,19 +2,31 @@
  * Get the brand that corresponds with the hostname.
  *
  * @param {function(string)} hostname - called with the URL of the current tab
+ * @param {function(string)} subdomainPrefix - called with the subdomain of the current tab
  *
  */
+let brandsPromise;
+
 function getBrandFromHostname(hostname, subdomainPrefix) {
-  return fetchCopilotData('api/configs', subdomainPrefix).then(function (brands) {
-    let brand = brands.find(function(config) {
-      let hostnames = config.hostnames || {};
-      return hostname.indexOf(config.hostnames.consumer) > -1 || hostname.indexOf(config.hostnames.preview) > -1;
+  if (!brandsPromise) {
+    brandsPromise = fetchCopilotData('api/configs', subdomainPrefix);
+  }
+
+  return new Promise(function (resolve, reject) {
+    brandsPromise.then(function (brands) {
+      let brand = brands.find(function(config) {
+        let hostnames = config.hostnames || {};
+        return hostname.indexOf(hostnames.consumer) > -1 || hostname.indexOf(hostnames.preview) > -1;
+      });
+      if (brand) {
+        resolve(brand);
+      } else {
+        throw new Error('brand not found in ' + JSON.stringify(brands))
+      }
+    }).catch(err => {
+      brandsPromise = false;
+      reject(err);
     });
-    if (brand) {
-      return brand;
-    } else {
-      throw new Error('brand not found in ' + JSON.stringify(brands))
-    }
   });
 }
 
@@ -28,7 +40,7 @@ function findCopilotContent(tab) {
 
   let hostname = url.hostname;
   let pathname = url.pathname;
-  let path = pathname.replace(/^\/*(.*?)\/*$/, '$1');
+  let identifier = pathname.replace(/^\/*(.*?)\/*$/, '$1');
   let subdomain = hostname.split(".")[0];
   let domain = hostname.split(".")[1];
 
@@ -50,9 +62,7 @@ function findCopilotContent(tab) {
     }
     Promise.reject(new Error('User does not have access to brand'));
   })
-
-  .then(searchCopilotByURI(encodeURIComponent(path), subdomainPrefix))
-
+  .then(searchCopilotByURI(encodeURIComponent(identifier), subdomainPrefix))
   .then(function(data) {
     if (data.hits.total === 1) {
       let hit = data.hits.hits[0];
@@ -70,7 +80,7 @@ function findCopilotContent(tab) {
   .catch(function (err) {
     console.error(err);
     chrome.browserAction.setBadgeText({text: '!', tabId: tab.id});
-    chrome.browserAction.setTitle({title: 'Error connecting, are you logged into Copilot', tabId: tab.id});
+    chrome.browserAction.setTitle({title: 'Error connecting, are you logged into Copilot?', tabId: tab.id});
   });
 }
 
@@ -93,7 +103,7 @@ function status(response) {
 }
 
 function json(response) {
-  return response.json()
+  return response.json();
 }
 
 function setBrandCookie(brandCode) {
@@ -122,7 +132,7 @@ function authInstance() {
 
 function searchCopilotByURI(uri, subdomainPrefix) {
   return function() {
-    return fetchCopilotData(`api/search?uri=${uri}`, subdomainPrefix);
+    return fetchCopilotData(`api/search?view=edit&uri=${uri}`, subdomainPrefix);
   }
 }
 
