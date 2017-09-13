@@ -77,7 +77,6 @@ function findCopilotContent(tab) {
   .then(searchCopilotByURI(copilotHostname, encodeURIComponent(identifier)))
   .then(function(data) {
     if (data.hits.total === 1) {
-      debugger;
       let hit = data.hits.hits[0];
       let url = `https://${copilotHostname}/${brand.code}/${hit._source.meta.collectionName}/${hit._id}`;
       let storageData = {};
