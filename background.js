@@ -7,21 +7,21 @@
  */
 let brandsPromise;
 
-function getBrandFromHostname(hostname, subdomainPrefix) {
+function getBrandFromHostname(copilotHostname, tabHostname) {
   if (!brandsPromise) {
-    brandsPromise = fetchCopilotData('api/configs', subdomainPrefix);
+    brandsPromise = fetchCopilotData(copilotHostname, 'api/configs');
   }
 
   return new Promise(function (resolve, reject) {
     brandsPromise.then(function (brands) {
       let brand = brands.find(function(config) {
         let hostnames = config.hostnames || {};
-        return hostname.indexOf(hostnames.consumer) > -1 || hostname.indexOf(hostnames.preview) > -1;
+        return tabHostname.indexOf(hostnames.consumer) > -1 || tabHostname.indexOf(hostnames.preview) > -1;
       });
       if (brand) {
         resolve(brand);
       } else {
-        throw new Error('brand not found in ' + JSON.stringify(brands))
+        reject();
       }
     }).catch(err => {
       brandsPromise = false;
@@ -37,36 +37,49 @@ function getBrandFromHostname(hostname, subdomainPrefix) {
 function findCopilotContent(tab) {
   let brand;
   let url = new URL(tab.url);
-
-  let hostname = url.hostname;
+  let tabHostname = url.hostname;
+  let copilotHostname = 'copilot.aws.conde.io';
   let pathname = url.pathname;
-  let identifier = pathname.replace(/^\/*(.*?)\/*$/, '$1');
-  let subdomain = hostname.split(".")[0];
-  let domain = hostname.split(".")[1];
+  let identifier = pathname.replace(/^\/*(.*?)\/*$/, '$1'); 
 
-  let subdomainPrefix = '';
-  subdomainPrefix = (subdomain === 'www') ? '' : subdomainPrefix;
-  subdomainPrefix = (subdomain === 'stag') ? 'stg-' : subdomainPrefix;
-  subdomainPrefix = (subdomain === 'ci') ? 'ci-' : subdomainPrefix;
-  subdomainPrefix = (subdomain === 'ap-ci') ? 'ci-' : subdomainPrefix;
+  if(!tabHostname.endsWith('.com')) {
+    copilotHostname = 'copilot.prod.cni.digital';
+  } else {
+    let subdomain = tabHostname.split(".")[0];
 
-  getBrandFromHostname(`${subdomain}.${domain}.com`, subdomainPrefix)
+    switch(subdomain) {
+      case 'stag':
+        copilotHostname = 'stg-copilot.aws.conde.io';
+        break;
+      case 'ci':
+        copilotHostname = 'ci-copilot.aws.conde.io';
+        break;
+      case 'ap-ci':
+        copilotHostname = 'ci-copilot.aws.conde.io';
+        break;
+      default:
+        copilotHostname = 'copilot.aws.conde.io';
+    }
+  }
+
+  getBrandFromHostname(copilotHostname, tabHostname)
   .then(function (result) {
     brand = result;
-    return authInstance();
+    return authInstance(copilotHostname);
   })
   .then(function (authObj) {
     // Check if user has access to brand
     if (authObj && authObj.brands.indexOf(brand.code) > -1) {
-      return setBrandCookie(brand.code);
+      return setBrandCookie(copilotHostname, brand.code);
     }
     Promise.reject(new Error('User does not have access to brand'));
   })
-  .then(searchCopilotByURI(encodeURIComponent(identifier), subdomainPrefix))
+  .then(searchCopilotByURI(copilotHostname, encodeURIComponent(identifier)))
   .then(function(data) {
     if (data.hits.total === 1) {
+      debugger;
       let hit = data.hits.hits[0];
-      let url = `https://${subdomainPrefix}copilot.aws.conde.io/${brand.code}/${hit._source.meta.collectionName}/${hit._id}`;
+      let url = `https://${copilotHostname}/${brand.code}/${hit._source.meta.collectionName}/${hit._id}`;
       let storageData = {};
       storageData[`url${tab.id}`] = url;
 
@@ -84,9 +97,9 @@ function findCopilotContent(tab) {
   });
 }
 
-function fetchCopilotData(path, subdomainPrefix) {
+function fetchCopilotData(copilotHostname, path) {
   return new Promise(function (resolve, reject) {
-    fetch(`https://${subdomainPrefix}copilot.aws.conde.io/${path}`, {credentials: 'include', redirect: 'manual'})
+    fetch(`https://${copilotHostname}/${path}`, {credentials: 'include', redirect: 'manual'})
     .then(status)
     .then(json)
     .then(resolve)
@@ -106,10 +119,10 @@ function json(response) {
   return response.json();
 }
 
-function setBrandCookie(brandCode) {
+function setBrandCookie(copilotHostname, brandCode) {
   return new Promise(function (resolve, reject) {
     let brandCookie = {
-      url: 'https://copilot.aws.conde.io/api/search',
+      url: `https://${copilotHostname}/api/search`,
       name: 'brand',
       value: brandCode,
       expirationDate: (new Date().getTime()/1000) + 10
@@ -126,13 +139,13 @@ function setBrandCookie(brandCode) {
   });
 }
 
-function authInstance() {
-  return fetchCopilotData('auth/instance', '');
+function authInstance(copilotHostname) {
+  return fetchCopilotData(copilotHostname, 'auth/instance');
 }
 
-function searchCopilotByURI(uri, subdomainPrefix) {
-  return function() {
-    return fetchCopilotData(`api/search?view=edit&uri=${uri}`, subdomainPrefix);
+function searchCopilotByURI(copilotHostname, uri) {
+  return function () {
+    return fetchCopilotData(copilotHostname, `api/search?view=edit&uri=${uri}`);
   }
 }
 
