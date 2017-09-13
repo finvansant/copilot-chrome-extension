@@ -13,7 +13,8 @@
   "permissions": [
     "storage",
     "cookies",
-    "*://*.conde.io/*"
+    "*://*.conde.io/*",
+    "*://*.cni.digital/*"
   ],
   "background": {
     "scripts": [
@@ -42,6 +43,7 @@
         "*://*.vanityfair.com/*",
         "*://*.vogue.com/*",
         "*://*.vogue.de/*",
+        "*://*.cni.digital/*",
         "*://*.wmagazine.com/*",
         "*://*.wired.com/*"
       ],

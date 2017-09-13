@@ -6,16 +6,16 @@
  */
 let brandsPromise;
 
-function getBrandFromHostname(hostname) {
+function getBrandFromHostname(copilotHostname, tabHostname) {
   if (!brandsPromise) {
-    brandsPromise = fetchCopilotData('api/configs');
+    brandsPromise = fetchCopilotData(copilotHostname, 'api/configs');
   }
 
   return new Promise(function (resolve, reject) {
     brandsPromise.then(function (brands) {
       let brand = brands.find(function(config) {
         let hostnames = config.hostnames || {};
-        return hostname.indexOf(hostnames.consumer) > -1 || hostname.indexOf(hostnames.preview) > -1;
+        return tabHostname.indexOf(hostnames.consumer) > -1 || tabHostname.indexOf(hostnames.preview) > -1;
       });
       if (brand) {
         resolve(brand);
@@ -36,28 +36,33 @@ function getBrandFromHostname(hostname) {
 function findCopilotContent(tab) {
   let brand;
   let url = new URL(tab.url);
+  let tabHostname = url.hostname;
+  let copilotHostname = 'copilot.aws.conde.io';
 
-  let hostname = url.hostname;
+  if(!tabHostname.endsWith('.com')) {
+    copilotHostname = 'copilot.prod.cni.digital';
+  }
+
   let pathname = url.pathname;
   let identifier = pathname.replace(/^\/*(.*?)\/*$/, '$1');
 
-  getBrandFromHostname(hostname)
+  getBrandFromHostname(copilotHostname, tabHostname)
   .then(function (result) {
     brand = result;
-    return authInstance();
+    return authInstance(copilotHostname);
   })
   .then(function (authObj) {
     // Check if user has access to brand
     if (authObj && authObj.brands.indexOf(brand.code) > -1) {
-      return setBrandCookie(brand.code);
+      return setBrandCookie(copilotHostname, brand.code);
     }
     Promise.reject(new Error('User does not have access to brand'));
   })
-  .then(searchCopilotByURI(encodeURIComponent(identifier)))
+  .then(searchCopilotByURI(copilotHostname, encodeURIComponent(identifier)))
   .then(function(data) {
     if (data.hits.total === 1) {
       let hit = data.hits.hits[0];
-      let url = `https://copilot.aws.conde.io/${brand.code}/${hit._source.meta.collectionName}/${hit._id}`;
+      let url = `https://${copilotHostname}/${brand.code}/${hit._source.meta.collectionName}/${hit._id}`;
       let storageData = {};
       storageData[`url${tab.id}`] = url;
 
@@ -74,9 +79,9 @@ function findCopilotContent(tab) {
   });
 }
 
-function fetchCopilotData(path) {
+function fetchCopilotData(copilotHostname, path) {
   return new Promise(function (resolve, reject) {
-    fetch(`https://copilot.aws.conde.io/${path}`, {credentials: 'include', redirect: 'manual'})
+    fetch(`https://${copilotHostname}/${path}`, {credentials: 'include', redirect: 'manual'})
     .then(status)
     .then(json)
     .then(resolve)
@@ -96,10 +101,10 @@ function json(response) {
   return response.json();
 }
 
-function setBrandCookie(brandCode) {
+function setBrandCookie(copilotHostname, brandCode) {
   return new Promise(function (resolve, reject) {
     let brandCookie = {
-      url: 'https://copilot.aws.conde.io/api/search',
+      url: `https://${copilotHostname}/api/search`,
       name: 'brand',
       value: brandCode,
       expirationDate: (new Date().getTime()/1000) + 10
@@ -116,13 +121,13 @@ function setBrandCookie(brandCode) {
   });
 }
 
-function authInstance() {
-  return fetchCopilotData('auth/instance');
+function authInstance(copilotHostname) {
+  return fetchCopilotData(copilotHostname, 'auth/instance');
 }
 
-function searchCopilotByURI(uri) {
+function searchCopilotByURI(copilotHostname, uri) {
   return function () {
-    return fetchCopilotData(`api/search?view=edit&uri=${uri}`);
+    return fetchCopilotData(copilotHostname, `api/search?view=edit&uri=${uri}`);
   }
 }
 
