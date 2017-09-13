@@ -90,7 +90,6 @@ function findCopilotContent(tab) {
     }
   })
   .catch(function (err) {
-    console.error(err);
     chrome.browserAction.setBadgeText({text: '!', tabId: tab.id});
     chrome.browserAction.setTitle({title: 'Error connecting, are you logged into Copilot?', tabId: tab.id});
   });
