@@ -1,8 +1,8 @@
 /**
  * Get the brand that corresponds with the hostname.
  *
- * @param {function(string)} hostname - called with the URL of the current tab
- * @param {function(string)} subdomainPrefix - called with the subdomain of the current tab
+ * @param {function(string)} copilotHostname - called with the copilot hostname
+ * @param {function(string)} tabHostname - called with the URL of the current tab
  *
  */
 let brandsPromise;
