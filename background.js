@@ -35,10 +35,9 @@ function getBrandFromHostname(copilotHostname, tabHostname) {
  * @param  {Object} tab         tab where digitalData refers to
  */
 function findCopilotContent(tab) {
-  let brand;
+  let brand, copilotHostname;
   let url = new URL(tab.url);
   let tabHostname = url.hostname;
-  let copilotHostname = 'copilot.aws.conde.io';
   let pathname = url.pathname;
   let identifier = pathname.replace(/^\/*(.*?)\/*$/, '$1'); 
 
@@ -91,7 +90,7 @@ function findCopilotContent(tab) {
   })
   .catch(function (err) {
     chrome.browserAction.setBadgeText({text: '!', tabId: tab.id});
-    chrome.browserAction.setTitle({title: 'Error connecting, are you logged into Copilot?', tabId: tab.id});
+    chrome.browserAction.setTitle({title: 'Error connecting to Copilot', tabId: tab.id});
   });
 }
 
